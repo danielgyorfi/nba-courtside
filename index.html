@@ -52,7 +52,8 @@
   .plays a { font-family: var(--display); font-size: 20px; letter-spacing: 1.5px; color: var(--ink); text-decoration: none;
     background: #000; border: 1px solid #3a3f4a; border-bottom: 3px solid var(--ball); border-radius: 6px; padding: 6px 14px 2px; }
   .plays a:hover { background: var(--ball); color: #1a0d03; }
-  html { scroll-behavior: smooth; } [id^="conf-"], #games-top, #news-top, #standings { scroll-margin-top: 14px; }
+  html { scroll-behavior: smooth; } [id^="conf-"], #games, #news { scroll-margin-top: 14px; }
+  #games { margin-top: 10px; } #news { margin-top: 28px; }
   .fav { color: var(--led); font-weight: 700; text-shadow: 0 0 8px rgba(255,184,61,.6); }
   tr.isfav .team > span:last-of-type { color: var(--led); }
   tr.isfav { box-shadow: inset 0 0 0 1px rgba(255,184,61,.45); }
@@ -213,7 +214,7 @@
       <p>NBA results tracker</p>
     </div>
     <nav class="plays" aria-label="Sections">
-      <a href="#conf-0">East</a><a href="#conf-1">West</a><a href="#games-top">Games</a><a href="#news-top">News</a>
+      <a href="#conf-0">East</a><a href="#conf-1">West</a><a href="#games">Games</a><a href="#news">News</a>
     </nav>
     <div class="clock">
       <div class="lbl">Last update</div>
@@ -227,10 +228,8 @@
 
   <div class="confs" id="standings"><div class="panel msg"><b>Warming up…</b>Fetching the latest standings</div></div>
 
-  <div class="banner" id="games-top"><h2>Recent games</h2><span class="note" id="games-note">Last 4 game days · tip times in your local time</span></div>
   <div id="games"><div class="panel msg"><b>Warming up…</b>Fetching scores</div></div>
 
-  <div class="banner" id="news-top"><h2>Top 5 news</h2></div>
   <div class="news" id="news"><div class="panel msg"><b>Warming up…</b>Fetching headlines</div></div>
 
   <footer><span>Live data from ESPN's public NBA feed · Not affiliated with the NBA or ESPN · Changes are remembered in this browser</span></footer>
