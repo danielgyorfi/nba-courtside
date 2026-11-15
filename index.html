@@ -152,8 +152,15 @@
   .perf .sub { color: #c1c6cf; }
   .cmp { margin-top: 9px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .cmp div { background: #0a0b0d; border: 1px solid #262a32; border-radius: 6px; text-align: center; padding: 3px 2px 4px; }
-  .cmp span { display: block; font-size: 11px; letter-spacing: 1.5px; color: var(--muted); font-weight: 700; }
+  .cmp div > span { display: block; font-size: 11px; letter-spacing: 1.5px; color: var(--muted); font-weight: 700; }
   .cmp b { font-family: var(--digits); font-size: 14.5px; font-weight: 500; } .cmp b i { font-style: normal; color: #6b717c; margin: 0 3px; }
+  .game.hot { border-color: var(--led-red); box-shadow: 0 10px 26px rgba(0,0,0,.45), 0 0 0 2px rgba(255,77,61,.7), 0 0 26px rgba(255,77,61,.45); }
+  .hots { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
+  .hots span { background: linear-gradient(#ff7a3d, #d92b1a); color: #fff; font-weight: 700; font-size: 13.5px; letter-spacing: 1px; text-transform: uppercase;
+    padding: 2px 9px 1px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .hots svg { width: 12px; height: 14px; }
+  .hotv { color: var(--led-red) !important; text-shadow: 0 0 10px rgba(255,77,61,.6); }
+  .perf .star em.hotv { color: var(--led-red); }
   .glink { display: inline-block; margin-top: 8px; font-size: 14px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; color: var(--ball); text-decoration: none; }
   .glink:hover { text-decoration: underline; }
 
@@ -235,7 +242,7 @@
 
   <div class="news" id="news"><div class="panel msg"><b>Warming up…</b>Fetching headlines</div></div>
 
-  <footer><span>Live data from ESPN's public NBA feed · Not affiliated with the NBA or ESPN · Changes are remembered in this browser · v4</span></footer>
+  <footer><span>Live data from ESPN's public NBA feed · Not affiliated with the NBA or ESPN · Changes are remembered in this browser · v5</span></footer>
 </div>
 
 <script>
@@ -363,6 +370,23 @@
   const leader = (c, name) => { const g = (c.leaders || []).find(x => x.name === name); const l = g && g.leaders && g.leaders[0]; return l && l.athlete ? { who: l.athlete.shortName || l.athlete.displayName, val: l.displayValue } : null; };
   const rec = c => { const r = (c.records || []).find(x => x.type === 'total') || (c.records || [])[0]; return r ? r.summary : ''; };
 
+  // What makes a game special: overtime, a 35+ point scorer, a team shooting above 55% FG or 50% 3P, or scoring above 140.
+  const HOT = { playerPts: 35, fgPct: 55, threePct: 50, teamPts: 140 };
+  const FLAME = '<svg viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><path d="M6 0c.4 2.4 3.6 4 3.6 7.6A3.6 3.6 0 0 1 6 14a3.6 3.6 0 0 1-3.6-3.6c0-1.6.8-2.6 1.6-3.4.2 1 .7 1.6 1.3 1.8C4.900 6 5.200 2.400 6 0z"/></svg>';
+  function hotness(cs, stt) {
+    const tags = [], hi = {};
+    const periods = Math.max(...cs.map(c => (c.linescores || []).length));
+    if (periods > 4 || /\bOT\b|\dOT/i.test(stt.shortDetail || '')) tags.push(periods > 5 ? (periods - 4) + 'OT' : 'Overtime');
+    cs.forEach((c, i) => {
+      const a = (c.team || {}).abbreviation, p = leader(c, 'points');
+      if (p && parseFloat(p.val) > HOT.playerPts) { tags.push(`${p.who} ${p.val} PTS`); hi['pts' + i] = 1; }
+      if (parseFloat(cstat(c, 'fieldGoalPct')) > HOT.fgPct) { tags.push(`${a} ${cstat(c, 'fieldGoalPct')}% FG`); hi['fieldGoalPct' + i] = 1; }
+      if (parseFloat(cstat(c, 'threePointPct')) > HOT.threePct) { tags.push(`${a} ${cstat(c, 'threePointPct')}% 3P`); hi['threePointPct' + i] = 1; }
+      if (parseFloat(c.score) > HOT.teamPts) { tags.push(`${a} ${c.score} points`); hi['score' + i] = 1; }
+    });
+    return { tags, hi };
+  }
+
   function gameCard(ev) {
     const comp = (ev.competitions || [])[0] || {};
     const cs = (comp.competitors || []).slice().sort((a, b) => (a.homeAway === 'home') - (b.homeAway === 'home')); // away first
@@ -371,28 +395,29 @@
     const tip = new Date(ev.date).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
     const badge = state === 'in' ? `<b class="live"><span class="live-dot"></span> ${esc(stt.shortDetail || 'Live')}</b>`
                 : state === 'post' ? `<b>${esc(stt.shortDetail || 'Final')}</b>` : `<b>Tip-off ${esc(tip)}</b>`;
-    const sides = cs.map(c => {
+    const hot = state === 'pre' ? { tags: [], hi: {} } : hotness(cs, stt);
+    const sides = cs.map((c, i) => {
       const t = c.team || {}; const qs = (c.linescores || []).map(q => `<span>${esc(q.displayValue ?? q.value)}</span>`).join('');
       const cls = state === 'post' ? (c.winner ? 'win' : 'lose') : '';
       return `<div class="side ${cls}">${jersey(t.abbreviation)}
         <div class="nm">${esc(t.shortDisplayName || t.displayName)}${star(t.abbreviation)}${c.winner && state === 'post' ? '<span class="wtag" title="Winner">◀</span>' : ''}<small>${esc(rec(c))} · ${c.homeAway === 'home' ? 'HOME' : 'AWAY'}</small></div>
         <div class="qs">${state === 'pre' ? '' : qs}</div>
-        <div class="tot">${state === 'pre' ? '–' : esc(c.score)}</div></div>`;
+        <div class="tot${hot.hi['score' + i] ? ' hotv' : ''}">${state === 'pre' ? '–' : esc(c.score)}</div></div>`;
     }).join('');
     let extra = '';
     if (state !== 'pre') {
-      const perf = cs.map(c => {
+      const perf = cs.map((c, i) => {
         const p = leader(c, 'points'), r = leader(c, 'rebounds'), a = leader(c, 'assists');
         if (!p) return '';
         const sub = [r && `${esc(r.who)} ${esc(r.val)} REB`, a && `${esc(a.who)} ${esc(a.val)} AST`].filter(Boolean).join(' · ');
-        return `<div class="row"><span class="tag">${esc((c.team || {}).abbreviation)}</span><span><span class="star">${esc(p.who)} <em>${esc(p.val)} PTS</em></span>${sub ? `<br><span class="sub">${sub}</span>` : ''}</span></div>`;
+        return `<div class="row"><span class="tag">${esc((c.team || {}).abbreviation)}</span><span><span class="star">${esc(p.who)} <em${hot.hi['pts' + i] ? ' class="hotv"' : ''}>${esc(p.val)} PTS</em></span>${sub ? `<br><span class="sub">${sub}</span>` : ''}</span></div>`;
       }).join('');
       const cmp = [['FG%', 'fieldGoalPct'], ['3P%', 'threePointPct'], ['REB', 'rebounds'], ['AST', 'assists']]
-        .map(([l, k]) => `<div><span>${l}</span><b>${esc(cstat(cs[0], k))}<i>·</i>${esc(cstat(cs[1], k))}</b></div>`).join('');
+        .map(([l, k]) => `<div><span>${l}</span><b>${[0, 1].map(i => `<span${hot.hi[k + i] ? ' class="hotv"' : ''}>${esc(cstat(cs[i], k))}</span>`).join('<i>·</i>')}</b></div>`).join('');
       extra = (perf ? `<div class="perf">${perf}</div>` : '') + `<div class="cmp" title="${esc((cs[0].team || {}).abbreviation)} · ${esc((cs[1].team || {}).abbreviation)}">${cmp}</div>`;
     }
     const link = ((ev.links || []).find(l => (l.rel || []).includes('summary')) || (ev.links || [])[0] || {}).href;
-    return `<article class="panel game${cs.some(c => isFav((c.team || {}).abbreviation)) ? ' isfav' : ''}"><div class="status"><span>${esc((comp.venue || {}).fullName || '')}</span>${badge}</div>${sides}${extra}
+    return `<article class="panel game${cs.some(c => isFav((c.team || {}).abbreviation)) ? ' isfav' : ''}${hot.tags.length ? ' hot' : ''}"><div class="status"><span>${esc((comp.venue || {}).fullName || '')}</span>${badge}</div>${hot.tags.length ? `<div class="hots">${hot.tags.map((t, i) => `<span>${i ? '' : FLAME}${esc(t)}</span>`).join('')}</div>` : ''}${sides}${extra}
       ${link ? `<a class="glink" href="${esc(safeUrl(link))}" target="_blank" rel="noopener">Box score ›</a>` : ''}</article>`;
   }
 
