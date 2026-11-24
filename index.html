@@ -110,7 +110,7 @@
   tr.cut div::before, tr.cut div::after { content: ""; flex: 1; border-top: 2px dashed currentColor; opacity: .7; }
   tr.cut.c1 div { color: var(--playoff); } tr.cut.c2 div { color: var(--playin); }
   .seed { font-family: var(--digits); font-weight: 700; font-size: 17px; width: 22px; display: inline-block; text-align: center; }
-  .mv { font-size: 12px; font-weight: 700; margin-left: 3px; }
+  .mv { font-size: 14px; font-weight: 700; } .mv.none { color: #5b616c; } td.mvc { width: 34px; }
   .mv.up { color: var(--up); } .mv.down { color: var(--down); }
   .team { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 18px; }
   .zone { font-size: 10.5px; letter-spacing: 1.5px; font-weight: 700; padding: 1px 6px; border-radius: 3px; text-transform: uppercase; }
@@ -135,6 +135,7 @@
   .games { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); gap: 16px; }
   .game { padding: 12px 14px 12px; }
   .status { display: flex; justify-content: space-between; align-items: center; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+  .status .gdate { color: var(--ink); margin-right: 6px; }
   .status b { color: var(--led); font-family: var(--digits); letter-spacing: 1px; } .status b.live { color: var(--led-red); }
   .side { display: grid; grid-template-columns: 34px 1fr auto auto; align-items: center; gap: 10px; padding: 5px 0; }
   .side .nm { font-weight: 600; font-size: 20px; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -242,7 +243,7 @@
 
   <div class="news" id="news"><div class="panel msg"><b>Warming up…</b>Fetching headlines</div></div>
 
-  <footer><span>Live data from ESPN's public NBA feed · Not affiliated with the NBA or ESPN · Changes are remembered in this browser · v5</span></footer>
+  <footer><span>Live data from ESPN's public NBA feed · Not affiliated with the NBA or ESPN · Changes are remembered in this browser · v6</span></footer>
 </div>
 
 <script>
@@ -253,7 +254,8 @@
     scoreboard: d => API + '/site/v2/sports/basketball/nba/scoreboard?dates=' + d,
     news: API + '/site/v2/sports/basketball/nba/news?limit=25',
   };
-  const DAYS_BACK = 3;               // today + 3 previous US game days
+  const DAYS_BACK = 2;               // US game days to fetch (covers the 48-hour window)
+  const WINDOW_MS = 48 * 3600e3;     // only show finished games that tipped off in the past 48 hours
   const FAVORITES = ['BOS', 'TOR', 'MIN', 'PHX'];   // my teams (ESPN abbreviations)
   const isFav = a => FAVORITES.includes(a);
   const star = a => isFav(a) ? ' <b class="fav" title="My team">★</b>' : '';
@@ -343,7 +345,7 @@
                   : t.rank === 10 ? `<tr class="cut c2"><td colspan="12"><div>Play-in line</div></td></tr>` : '';
         const sk = (t.strk || '').charAt(0);
         return `<tr class="t ${zone}${isFav(t.abbr) ? ' isfav' : ''}">
-          <td class="l"><span class="seed">${t.rank}</span>${mv}</td>
+          <td class="l mvc">${mv || '<span class="mv none">–</span>'}</td>
           <td class="l"><div class="team">${jersey(t.abbr)}<span>${esc(t.name)}${star(t.abbr)}</span></div></td>
           <td><span class="num">${t.w + t.l}</span>${chip(dw + dl, 'g')}</td>
           <td><span class="num">${t.w}</span>${chip(dw, 'w')}</td>
@@ -356,7 +358,7 @@
       return `<section class="panel" id="conf-${ci}">
         <div class="conf-head"><h3>${esc(c.name.replace(/ Conference/i, ''))}<small>CONFERENCE</small></h3></div>
         <div class="scroll"><table>
-          <thead><tr><th class="l">#</th><th class="l">Team</th><th title="Games played">GP</th><th>W</th><th>L</th><th>PCT</th><th title="Games behind">GB</th>
+          <thead><tr><th class="l" title="Ranking change since previous numbers">±</th><th class="l">Team</th><th title="Games played">GP</th><th>W</th><th>L</th><th>PCT</th><th title="Games behind">GB</th>
           <th class="hide-s hide-m">Home</th><th class="hide-s hide-m">Away</th><th title="Last 10 games">L10</th><th title="Streak">Strk</th><th class="hide-s" title="Average point differential">Diff</th></tr></thead>
           <tbody>${rows}</tbody></table></div>
         <div class="legend"><span><i style="background:var(--playoff)"></i>1–6 Playoffs</span><span><i style="background:var(--playin)"></i>7–10 Play-in</span><span><span class="d w">+1</span> change since previous numbers${esc(since)}</span><span><b class="fav">★</b> My teams</span></div>
@@ -392,6 +394,9 @@
     const cs = (comp.competitors || []).slice().sort((a, b) => (a.homeAway === 'home') - (b.homeAway === 'home')); // away first
     if (cs.length < 2) return '';
     const stt = (ev.status || {}).type || {}; const state = stt.state;
+    const ed = new Date(ev.date);
+    const gp = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', day: '2-digit', month: 'short', year: '2-digit' }).formatToParts(ed).map(x => [x.type, x.value]));
+    const gdate = (gp.day + gp.month + gp.year).toUpperCase();   // DDMMMYY, US game date
     const tip = new Date(ev.date).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
     const badge = state === 'in' ? `<b class="live"><span class="live-dot"></span> ${esc(stt.shortDetail || 'Live')}</b>`
                 : state === 'post' ? `<b>${esc(stt.shortDetail || 'Final')}</b>` : `<b>Tip-off ${esc(tip)}</b>`;
@@ -417,35 +422,34 @@
       extra = (perf ? `<div class="perf">${perf}</div>` : '') + `<div class="cmp" title="${esc((cs[0].team || {}).abbreviation)} · ${esc((cs[1].team || {}).abbreviation)}">${cmp}</div>`;
     }
     const link = ((ev.links || []).find(l => (l.rel || []).includes('summary')) || (ev.links || [])[0] || {}).href;
-    return `<article class="panel game${cs.some(c => isFav((c.team || {}).abbreviation)) ? ' isfav' : ''}${hot.tags.length ? ' hot' : ''}"><div class="status"><span>${esc((comp.venue || {}).fullName || '')}</span>${badge}</div>${hot.tags.length ? `<div class="hots">${hot.tags.map((t, i) => `<span>${i ? '' : FLAME}${esc(t)}</span>`).join('')}</div>` : ''}${sides}${extra}
+    return `<article class="panel game${cs.some(c => isFav((c.team || {}).abbreviation)) ? ' isfav' : ''}${hot.tags.length ? ' hot' : ''}"><div class="status"><span><b class="gdate">${esc(gdate)}</b> ${esc((comp.venue || {}).fullName || '')}</span>${badge}</div>${hot.tags.length ? `<div class="hots">${hot.tags.map((t, i) => `<span>${i ? '' : FLAME}${esc(t)}</span>`).join('')}</div>` : ''}${sides}${extra}
       ${link ? `<a class="glink" href="${esc(safeUrl(link))}" target="_blank" rel="noopener">Box score ›</a>` : ''}</article>`;
   }
 
   let anyLive = false;
   function renderGames(results, days) {
     const seen = new Set(); const live = [], upcoming = [], finals = [];
-    let okCount = 0;
-    results.forEach((r, i) => {
+    let okCount = 0; const cutoff = Date.now() - WINDOW_MS;
+    results.forEach(r => {
       if (r.status !== 'fulfilled') return; okCount++;
-      const list = [];
       (r.value.events || []).forEach(ev => {
         if (seen.has(ev.id)) return; seen.add(ev.id);
         const s = ((ev.status || {}).type || {}).state;
-        (s === 'in' ? live : s === 'post' ? list : upcoming).push(ev);
+        if (s === 'in') live.push(ev);
+        else if (s === 'post') { if (new Date(ev.date).getTime() >= cutoff) finals.push(ev); }
+        else upcoming.push(ev);
       });
-      if (list.length) finals.push({ day: days[i], list });
     });
     if (!okCount) throw new Error('no scoreboard');
     anyLive = live.length > 0;
-    const fmtDay = d => new Date(d + 'T12:00:00').toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
     const favGame = ev => (((ev.competitions || [])[0] || {}).competitors || []).some(c => isFav((c.team || {}).abbreviation)) ? 0 : 1;
-    const block = (title, list) => `<div><div class="day">${title}</div><div class="games">${list.slice().sort((a, b) => favGame(a) - favGame(b)).map(gameCard).join('')}</div></div>`;
-    let html = '';
-    if (live.length) html += block('<span class="live-dot"></span> Live now', live);
-    finals.forEach(f => { html += block('Final · ' + esc(fmtDay(f.day)), f.list); });
+    const usDay = ev => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(ev.date));
+    // newest game day first; within a day my teams first, then latest tip-off
+    finals.sort((a, b) => usDay(b).localeCompare(usDay(a)) || favGame(a) - favGame(b) || new Date(b.date) - new Date(a.date));
     upcoming.sort((a, b) => new Date(a.date) - new Date(b.date));
-    if (upcoming.length) html += block('Up next', upcoming);
-    $('games').innerHTML = html || '<div class="panel msg"><b>No games on the floor</b>No NBA games in the last few days.</div>';
+    const cards = [...live, ...finals, ...upcoming].map(gameCard).join('');
+    const html = cards ? `<div class="games">${cards}</div>` : '';
+    $('games').innerHTML = html || '<div class="panel msg"><b>No games on the floor</b>No NBA games in the past 48 hours.</div>';
   }
 
   /* ================= news ================= */
